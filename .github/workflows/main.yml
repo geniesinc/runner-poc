@@ -33,6 +33,9 @@ jobs:
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v3
+      
+      - name: Install AWS cli
+        uses: unfor19/install-aws-cli-action@v1
 
       - name: Assume an AWS role
         uses: aws-actions/configure-aws-credentials@v1
