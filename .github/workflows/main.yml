@@ -3,16 +3,18 @@ name: Art Runner Testing
 
 # Controls when the workflow will run
 on:
-  # Triggers the workflow on push or pull request events but only for the "main" branch
-  push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
-
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
-  #needed for http req
+    inputs:
+      artifact:
+        description: 'Name of the artifact to download'
+        required: true
+  # Needed for HTTP request
   repository_dispatch:
+    inputs:
+      artifact:
+        description: 'Name of the artifact to download'
+        required: true
 
 # A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
@@ -25,7 +27,7 @@ jobs:
       id-token: write # This is required for requesting the JWT
       contents: read  # This is required for actions/checkout
     env:
-      test: "Hello world!"
+      bucket_name: "runner-poc-bucket"
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
@@ -35,10 +37,27 @@ jobs:
       - name: Assume an AWS role
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          role-to-assume: arn:aws:iam::608392574519:role/devkit-s3-manager
+          role-to-assume: arn:aws:iam::583625886946:role/genies_deployer-role #arn:aws:iam::608392574519:role/devkit-s3-manager
           aws-region: us-west-2
       
-      - name: Do anything!
+#       - name: upload a test file
+#         run: |
+#           echo 'This file is unprocessed' >> ${{ inputs.artifact }}
+#           aws s3 cp ${{ inputs.artifact }} s3://${{ env.bucket_name }}/
+#         shell: bash
+        
+        
+      - name: Download a file from S3
         run: |
-          echo $test
+          aws s3 cp s3://runner-poc-bucket/${{ inputs.artifact }} ${{ inputs.artifact }}
+        shell: bash
+        
+      - name: Process the file
+        run: |
+          echo 'This file is now processed!' >> ${{ inputs.artifact }}
+        shell: bash
+      
+      - name: Upload a processed file to S3
+        run: |
+          aws s3 cp ${{ inputs.artifact }} s3://${{ env.bucket_name }}/processed-${{ inputs.artifact }}
         shell: bash
