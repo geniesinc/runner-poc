@@ -27,7 +27,8 @@ jobs:
       id-token: write # This is required for requesting the JWT
       contents: read  # This is required for actions/checkout
     env:
-      bucket_name: "runner-poc-bucket"
+      start_bucket_name: "runner-poc-bucket"
+      result_bucket_name: "runner-poc-testing-result"
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
@@ -42,17 +43,10 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::583625886946:role/genies_deployer-role #arn:aws:iam::608392574519:role/devkit-s3-manager
           aws-region: us-west-2
-      
-#       - name: upload a test file
-#         run: |
-#           echo 'This file is unprocessed' >> ${{ inputs.artifact }}
-#           aws s3 cp ${{ inputs.artifact }} s3://${{ env.bucket_name }}/
-#         shell: bash
         
-        
-      - name: Download a file from S3
+      - name: Download a file from the starting bucket
         run: |
-          aws s3 cp s3://runner-poc-bucket/${{ inputs.artifact }} ${{ inputs.artifact }}
+          aws s3 cp s3://${{ env.start_bucket_name }}/${{ inputs.artifact }} ${{ inputs.artifact }}
         shell: bash
         
       - name: Process the file
@@ -62,5 +56,5 @@ jobs:
       
       - name: Upload a processed file to S3
         run: |
-          aws s3 cp ${{ inputs.artifact }} s3://${{ env.bucket_name }}/processed-${{ inputs.artifact }}
+          aws s3 cp ${{ inputs.artifact }} s3://${{ env.result_bucket_name }}/processed-${{ inputs.artifact }}
         shell: bash
