@@ -3,6 +3,8 @@
 This repo contains the demo actions jobs that were used to demo this process:
 https://docs.google.com/drawings/d/1R6n6SzTEo3B4bZyUlyGNn0YGQNiz2_MA_w-z343CmM4/edit?usp=sharing
 
+Fork this repo if you'd like to play around with the job I have defined here.
+
 The terraform code here manages the infra made for the demo.  Be sure to be locally logged into the infra account and then run your init command.  Note, the state file for this is located here, so if you tinker with it, you need to inform anyone else who is using this repo to pull the latest.
 
 The trigger_job.py contains the code the lambda job needs to do its purpose as defined in the diagram.  It is packed into a docker image and deployed manually to the lambda.
