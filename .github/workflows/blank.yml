@@ -1,5 +1,5 @@
 #name of the job
-name: Art Runner Testing
+name: Upload sample file
 
 # Controls when the workflow will run
 on:
@@ -27,8 +27,7 @@ jobs:
       id-token: write # This is required for requesting the JWT
       contents: read  # This is required for actions/checkout
     env:
-      start_bucket_name: "runner-poc-bucket"
-      result_bucket_name: "runner-poc-testing-result"
+      bucket_name: "runner-poc-bucket"
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
@@ -43,18 +42,9 @@ jobs:
         with:
           role-to-assume: arn:aws:iam::583625886946:role/genies_deployer-role #arn:aws:iam::608392574519:role/devkit-s3-manager
           aws-region: us-west-2
-        
-      - name: Download a file from the starting bucket
-        run: |
-          aws s3 cp s3://${{ env.start_bucket_name }}/${{ inputs.artifact }} ${{ inputs.artifact }}
-        shell: bash
-        
-      - name: Process the file
-        run: |
-          echo 'This file is now processed!' >> ${{ inputs.artifact }}
-        shell: bash
       
-      - name: Upload a processed file to S3
+      - name: upload a test file
         run: |
-          aws s3 cp ${{ inputs.artifact }} s3://${{ env.result_bucket_name }}/processed-${{ inputs.artifact }}
+          echo 'This file is unprocessed' >> ${{ inputs.artifact }}
+          aws s3 cp ${{ inputs.artifact }} s3://${{ env.bucket_name }}/
         shell: bash
