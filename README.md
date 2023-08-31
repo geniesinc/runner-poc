@@ -10,9 +10,11 @@ The terraform code here manages the infra made for the demo.  Be sure to be loca
 The trigger_job.py contains the code the lambda job needs to do its purpose as defined in the diagram.  It is packed into a docker image and deployed manually to the lambda.
 
 Deploying lambda image:
+```
 docker buildx build -t lambda-github-action-trigger . --platform=linux/amd64
 docker tag lambda-github-action-trigger:latest 583625886946.dkr.ecr.us-west-2.amazonaws.com/lambda-github-action-trigger:latest
 docker push 583625886946.dkr.ecr.us-west-2.amazonaws.com/lambda-github-action-trigger:latest
+```
 
 
 
@@ -25,6 +27,7 @@ Dependencies:
 
 
 example event that is received:
+```
 {
   "Records": [
     {
@@ -64,3 +67,4 @@ example event that is received:
     }
   ]
 }
+```
