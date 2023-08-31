@@ -22,7 +22,12 @@ Dependencies:
 - A github app installed to the org, providing a headless user to do the tasks.
 - Github app setup with proper permissions to access actions.
 - Private key from the github app for API auth and security purposes.
-- Job configured to be triggered manually (this is part of writing the yaml of your job anyway).
+- Job configured to be triggered manually (this is part of writing the yaml of your job anyway).  E.g:
+```
+  on:
+    repository_dispatch:
+  ```
+  
 
 
 
