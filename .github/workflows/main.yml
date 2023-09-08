@@ -23,8 +23,6 @@ jobs:
     # The type of runner that the job will run on
     runs-on: 
       group: genies-art-runners
-    container:
-      image: unityci/editor:ubuntu-2021.3.26f1-android-2.0.0
     permissions:
       id-token: write # This is required for requesting the JWT
       contents: read  # This is required for actions/checkout
