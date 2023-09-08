@@ -9,6 +9,9 @@ on:
       artifact:
         description: 'Name of the artifact to download'
         required: true
+      start-bucket-name:
+        description: 'Name of the bucket'
+        required: true
   # Needed for HTTP request
   # repository_dispatch:
   #   inputs:
@@ -35,7 +38,11 @@ jobs:
         
       - name: Hi
         run: |
-          echo 'hello world'
+          echo "hello world...${{ inputs.start-bucket-name }}"
+        shell: bash
+      - name: bye
+        run: |
+          echo "hello world...${{ inputs.artifact }}"
         shell: bash
     
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
