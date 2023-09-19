@@ -43,14 +43,14 @@ def get_pem():
     return secret
 
 
-def executeJob(token, filename, jobid):
+def executeJob(token,artifact,jobid,repository,bucket_name,workflow_file,branch):
     headers = {
         'X-GitHub-Api-Version': '2022-11-28',
         'Accept': 'application/vnd.github+json',
         'Authorization': f'Bearer {token}'
     }
-    payload = {"ref": "main", "inputs": {"artifact":f'{filename}'}}
-    url = f'https://api.github.com/repos/geniesinc/runner-poc/actions/workflows/{jobid}/dispatches'
+    payload = {"ref": f'{branch}', "inputs": {"artifact":f'{artifact}', "start-bucket-name":f'{bucket_name}'}}
+    url = f'https://api.github.com/repos/geniesinc/{repository}/actions/workflows/{workflow_file}/dispatches'
 
     req = urllib.request.Request(url, headers=headers, data=json.dumps(payload).encode('utf-8'), method='POST')
     try:
@@ -102,13 +102,16 @@ def lambda_handler(event, context):
     bucket_name = event["Records"][0]["s3"]["bucket"]["name"]
     object_key = event["Records"][0]["s3"]["object"]["key"]
     
-    filename = object_key.split("/")[-1]
+    artifact = object_key.split("/")[-1]
     
     print(f"Object key: {object_key}")
     
-    jobid = environ.get('GH_JOB_ID')
-    if not jobid:
-        raise ValueError("GH_JOB_ID environment variable is not set")
+    jobid = "obsolete" #environ.get('GH_JOB_ID')
+    repository = environ.get('GH_REPO')
+    branch = environ.get('GH_BRANCH')
+    workflow_file = environ.get('WORKFLOW_FILE')
+    if not jobid or not repository:
+        raise ValueError("GH_JOB_ID or GH_REPO environment variable is not set")
 
     githubAppNumber = "39576324" 
     #number of the github app in our org for this purpose.  This is not the same as the app ID.
@@ -117,7 +120,7 @@ def lambda_handler(event, context):
 
     token = getInstallationToken(jwt,githubAppNumber)
 
-    executeJob(token,filename,jobid)
+    executeJob(token,artifact,jobid,repository,bucket_name,workflow_file,branch)
     
     return {
         "statusCode": 200,
