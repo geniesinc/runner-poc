@@ -1,48 +1,30 @@
-#name of the job
 name: Art Runner Testing
 
-# Controls when the workflow will run
 on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
-    inputs:
-      artifact:
-        description: 'Name of the artifact to download'
-        required: true
-      start-bucket-name:
-        description: 'Name of the bucket'
-        required: true
-  # Needed for HTTP request
-  # repository_dispatch:
-  #   inputs:
-  #     artifact:
-  #       description: 'Name of the artifact to download'
-  #       required: true
+    # inputs:
+    #   artifact:
+    #     description: 'Name of the artifact to download'
+    #     required: true
+    #   start-bucket-name:
+    #     description: 'Name of the bucket'
+    #     required: true
 
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+
 jobs:
-  # This workflow contains a single job called "build"
+
   build:
-    # The type of runner that the job will run on
-    runs-on: 
-      group: genies-art-runners
-    permissions:
-      id-token: write # This is required for requesting the JWT
-      contents: read  # This is required for actions/checkout
+    runs-on: genies-internal-content-runner
     env:
       start_bucket_name: "runner-poc-bucket"
       result_bucket_name: "runner-poc-testing-result"
-
-    # Steps represent a sequence of tasks that will be executed as part of the job
+      
     steps:
         
       - name: Hi
         run: |
-          echo "hello world...${{ inputs.start-bucket-name }}"
-        shell: bash
-      - name: bye
-        run: |
-          echo "hello world...${{ inputs.artifact }}"
+          sleep 300
         shell: bash
     
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
