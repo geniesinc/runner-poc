@@ -16,6 +16,7 @@ jobs:
 
   build:
     runs-on: genies-internal-content-runner
+    timeout-minutes: 1
     env:
       start_bucket_name: "runner-poc-bucket"
       result_bucket_name: "runner-poc-testing-result"
