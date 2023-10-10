@@ -30,14 +30,21 @@ jobs:
           sleep 300
         shell: bash
 
-      - name: Retry on failure of build
-        if: failure()
-        uses: mvasigh/dispatch-action@main
+      - name: rerun job
+        uses: benc-uk/workflow-dispatch@v1
         with:
-          token: fa3126c935cae0eaddba6f4c7cb5249bf3c62bd8
-          repo: runner-poc
-          owner: geniesinc
-          event_type: retry_job
+          workflow: Update image tags
+          repo: geniesinc/runner-poc
+          ref: main
+          token: ${{ secrets.PRIVATE_REPO_ACCESS_TOKEN }}
+      # - name: Retry on failure of build
+      #   if: always() && failure()
+      #   uses: mvasigh/dispatch-action@main
+      #   with:
+      #     token: fa3126c935cae0eaddba6f4c7cb5249bf3c62bd8
+      #     repo: runner-poc
+      #     owner: geniesinc
+      #     event_type: retry_job
     
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       # - uses: actions/checkout@v3
