@@ -3,6 +3,8 @@ name: Art Runner Testing
 on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
+  repository_dispatch:
+    types: [retry_job]
     # inputs:
     #   artifact:
     #     description: 'Name of the artifact to download'
@@ -16,6 +18,7 @@ jobs:
 
   build:
     runs-on: genies-internal-content-runner
+    timeout-minutes: 1
     env:
       start_bucket_name: "runner-poc-bucket"
       result_bucket_name: "runner-poc-testing-result"
@@ -26,6 +29,15 @@ jobs:
         run: |
           sleep 300
         shell: bash
+
+      - name: Retry on failure of build
+        if: failure()
+        uses: mvasigh/dispatch-action@main
+        with:
+          token: fa3126c935cae0eaddba6f4c7cb5249bf3c62bd8
+          repo: runner-poc
+          owner: geniesinc
+          event_type: retry_job
     
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       # - uses: actions/checkout@v3
