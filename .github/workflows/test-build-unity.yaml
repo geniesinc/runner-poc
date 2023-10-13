@@ -1,0 +1,565 @@
+name: Content Build
+
+# If another run happens on the branch, cancel current runs.
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}-${{ github.event.inputs.artifact }}
+  cancel-in-progress: false
+
+on:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: 'Runner Group to Use'
+        default: 'genies-internal-content-runner'
+        required: true
+        type: choice
+        options:
+          - genies-internal-content-runner
+          - ubuntu-latest
+      build-workflow-version:
+        description: 'Version of the Build Workflow'
+        default: '0.0.1'
+        required: true
+        type: string
+      devkit-version:
+        description: 'Version of the Dev Kit'
+        default: '0.0.1'
+        required: true
+        type: string
+      start-bucket-name:
+        description: 'S3 Bucket for Unity Package'
+        default: 'content-pipeline-dev'
+        required: true
+        type: string
+      artifact:
+        description: 'S3 Key for Unity Package'
+        default: 'Wardrobe_Static/bracelet-0001-bangle.unitypackage'
+        required: true
+        type: string
+      platforms:
+        description: >
+          Comma separated list of platforms, the casing of the platform should be respected
+        required: true
+        default: 'iOS, Android, StandaloneOSX, StandaloneWindows64, StandaloneLinux64'
+        type: string
+      owner:
+        description: 'Owner of the Unity Package'
+        required: true
+        default: 'internal'
+        type: string
+      guid:
+        description: 'The Build Row GUID'
+        required: true
+        default: 'NULL'
+        type: string
+      attempt:
+        description: 'Workflow Attempt'
+        required: true
+        default: '0'
+        type: string
+        
+# env vars for whole workflow
+env:
+  AIRTABLE_API_TOKEN: ${{ secrets.AIRTABLE_API_TOKEN }}
+  AIRTABLE_BASE_ID: 'appQEIesW8oqnaJhL'
+  AIRTABLE_TABLE_ID: 'tblv8clFfDh29J4aP'
+  AIRTABLE_VIEW_NAME: 'Content Pipeline Delivery'
+  DATADOG_API_KEY: ${{ secrets.DATADOG_API_KEY }}
+  SERVICE_NAME: 'dynamic-content-pipeline'
+  
+jobs:
+  setup:
+    name: Job Setup
+    runs-on: ${{ inputs.runner }}
+    outputs:
+      platforms-matrix: '${{ steps.setup.outputs.platforms_matrix }}'
+      job-guid: '${{ steps.add-record-to-build-table.outputs.job_guid }}'
+      workflow-link: '${{ steps.get-workflow-link.outputs.workflow_link }}'
+    steps:
+      - name: Setup Job Matrices
+        id: setup
+        env:
+          PLATFORMS_STRING: ${{ inputs.platforms }}
+        run: |
+          PLATFORMS_MATRIX=$(echo "$PLATFORMS_STRING" | tr -d ' ' | perl -p -e "s/,/\",\"/g" | sed 's/^/[\"/g' | sed 's/$/\"]/g')
+          echo "platforms_matrix=$PLATFORMS_MATRIX" >> $GITHUB_OUTPUT
+      
+      # Set up Python
+      - name: Set up Python
+        uses: actions/setup-python@v3
+        with:
+          python-version: 3.8
+      
+      # Install Python dependencies
+      - name: Install Python dependencies
+        run: |
+          pip install requests
+          pip install pyyaml
+          pip install awscli
+      
+      # Checkout python scripts
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.PRIVATE_REPO_ACCESS_TOKEN }}
+          sparse-checkout: |
+            .github/
+            Scripts/
+            
+      # Get Workflow Link
+      - name: Get Workflow Link
+        id: get-workflow-link
+        run: |
+          workflow_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          echo "workflow_link=$workflow_url" >> $GITHUB_OUTPUT
+          echo "$workflow_url"      
+      
+      # Add Record to Build Table and Get Job Guid
+      - name: Add Record to Build Table and Get Job Guid
+        id: add-record-to-build-table
+        run: |
+          if [ "${{ inputs.guid }}" == "NULL" ]; then
+            result=$(python3 Scripts/Workflows/add-record-to-build-table.py)
+            echo "job_guid=$result" >> $GITHUB_OUTPUT
+            echo "job guid: $result"
+          else
+            result=$(python3 Scripts/Workflows/update-record-to-build-table.py)
+            echo "job_guid=${{ inputs.guid }}" >> $GITHUB_OUTPUT
+            echo "job guid: ${{ inputs.guid }}"
+          fi
+          
+        env:
+          AIRTABLE_API_TOKEN: ${{ secrets.AIRTABLE_API_TOKEN }}
+          WORKFLOW_LINK: ${{ steps.get-workflow-link.outputs.workflow_link }}
+          JOB_GUID: ${{ inputs.guid }}
+  
+  build:
+    name: Addressables build for ${{ matrix.targetPlatform }}
+    needs: setup
+    runs-on: ${{ inputs.runner }}
+    timeout-minutes: 20
+    continue-on-error: true
+    strategy:
+      max-parallel: 5
+      fail-fast: false
+      matrix:
+        targetPlatform: ${{ fromJson(needs.setup.outputs.platforms-matrix) }}
+    outputs:
+      iOS: ${{ steps.get-partial-job-status.outputs.iOS }}
+      Android: ${{ steps.get-partial-job-status.outputs.Android }}
+      StandaloneOSX: ${{ steps.get-partial-job-status.outputs.StandaloneOSX }}
+      StandaloneWindows64: ${{ steps.get-partial-job-status.outputs.StandaloneWindows64 }}
+      StandaloneLinux64: ${{ steps.get-partial-job-status.outputs.StandaloneLinux64 }}
+    steps:
+      # Checkout
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.PRIVATE_REPO_ACCESS_TOKEN }}
+          submodules: 'true'
+          lfs: 'true'
+      
+      # Set up Python
+      - name: Set up Python
+        uses: actions/setup-python@v3
+        with:
+          python-version: 3.8
+      
+      # Install Python dependencies
+      - name: Install Python dependencies
+        run: |
+          pip install requests
+          pip install pyyaml
+          pip install awscli
+      
+      # Setup AWS
+      - name: Set up AWS CLI
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_RUNNERS_DEV_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_RUNNERS_DEV_SECRET_KEY }}
+          aws-region: 'us-west-2'
+          
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+        with:
+          mask-password: 'true'
+
+      - name: Login to AWS ECR
+        run: |
+          aws ecr get-login-password --region us-west-2 | docker login --username AWS --password-stdin 608392574519.dkr.ecr.us-west-2.amazonaws.com
+      
+      # Get the day of the year, we're using this for caching on a daily basis
+      - name: Get current day of year
+        id: day-of-year
+        run: echo "day=$(date +'%j')" >> $GITHUB_OUTPUT
+
+      # Cache
+      - uses: actions/cache@v3
+        id: cache
+        with:
+          path: |
+            Library
+          key: Library-${{ matrix.targetPlatform }}-${{ steps.day-of-year.outputs.day }}
+          restore-keys: |
+            Library-${{ matrix.targetPlatform }}
+      
+      # Get Asset Names
+      - name: Get Asset Names
+        id: get-asset-names
+        run: |
+          S3_KEY=${{ inputs.artifact }}
+          FILENAME=$(basename $S3_KEY)
+          FILENAME_NO_EXT=$(basename $S3_KEY | sed 's/\.[^.]*$//')
+          echo "asset_path=$FILENAME" >> $GITHUB_OUTPUT
+          
+      - name: Transform matrix key to lowercase
+        id: transform-matrix
+        run: |
+          platform_lower=$(echo ${{ matrix.targetPlatform }} | tr '[:upper:]' '[:lower:]')
+          echo "lower=$platform_lower" >> $GITHUB_OUTPUT
+      
+      # Download UnityPackage
+      - name: Download UnityPackage from S3
+        id: download-unitypackage-from-s3
+        run: |
+          S3_BUCKET=${{ inputs.start-bucket-name }}
+          S3_KEY=${{ inputs.artifact }}
+          S3_PATH=s3://${S3_BUCKET}/${S3_KEY}
+          aws s3 cp $S3_PATH ${{ steps.get-asset-names.outputs.asset_path }}
+      # Build
+      - name: Build Addressables Content for ${{ matrix.targetPlatform }}
+        uses: geniesinc/game-ci-unity-builder@raad/no-quit
+        env:
+          UNITY_LICENSE: ${{ secrets.GAMECI_UNITY_LICENSE }}
+        with:
+          customImage: '608392574519.dkr.ecr.us-west-2.amazonaws.com/unityci-editor:ubuntu-2021.3.26f1-${{ steps.transform-matrix.outputs.lower }}-1'
+          targetPlatform: ${{ matrix.targetPlatform }}
+          buildMethod: 'Genies.Editor.Build.HeadlessDynamicBuildScript.HeadlessBuild'
+          customParameters: '-packageUrlOrPath ${{ steps.get-asset-names.outputs.asset_path }} -platforms ${{ matrix.targetPlatform }}
+            -jobGuid ${{ needs.setup.outputs.job-guid }} -buildProfile Dynamic -owner ${{ inputs.owner }}
+            -datadogApiKey ${{ secrets.DATADOG_API_KEY }} -serviceName dynamic-content-pipeline -hostName ${{ inputs.runner }}'     
+      
+      # Get Partial Job Status
+      - name: Get Build Job Status
+        id: get-partial-job-status
+        run: |
+          # Extract data from the serialized YAML file
+          job_status_object=$(python3 Scripts/Workflows/get-partial-job-status.py)
+          echo "$job_status_object"
+          status=$(echo "$job_status_object" | jq -r '.status')
+          echo "Job: $status"
+          echo "${{ matrix.targetPlatform }}=$job_status_object" >> $GITHUB_OUTPUT
+          echo "status=$status" >> $GITHUB_OUTPUT
+          echo "status_object==$job_status_object" >> $GITHUB_OUTPUT
+        env:
+          JOB_GUID: ${{ needs.setup.outputs.job-guid }}
+          
+      # Handle Fail Status
+      - name: Handle Fail Status
+        id: handle-fail-status
+        run: |
+          job_status_object="${{ steps.get-partial-job-status.outputs.status_object }}"
+          status="${{ steps.get-partial-job-status.outputs.status }}"
+          if [[ "$status" == "FAIL" ]]; then
+            S3_BUCKET=$(echo "$job_status_object" | jq -r '.bucket')
+            S3_KEY=$(echo "$job_status_object" | jq -r '.key')
+            S3_URL=$(echo "$job_status_object" | jq -r '.logurl')
+            LOCAL_PATH=$(echo "$job_status_object" | jq -r '.logpath')
+            S3_PATH=s3://${S3_BUCKET}/${S3_KEY}
+            aws s3 cp $LOCAL_PATH $S3_PATH
+            echo "Stack Trace Url: $S3_URL"
+          else
+            echo "$status"
+            # Add commands to run when the condition is false
+          fi
+      
+      # Output
+      - uses: actions/upload-artifact@v3
+        with:
+          name: Content-build
+          path: ServerData/
+          retention-days: 1
+  
+  Postproccessing:
+    name: Job Post Processing
+    runs-on: ${{ inputs.runner }}
+    needs: [build, setup]        
+    steps:
+      - name: Check Statuses
+        run: echo '${{ toJSON(needs.build.outputs) }}'
+        
+      # Checkout
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          token: ${{ secrets.PRIVATE_REPO_ACCESS_TOKEN }}
+          submodules: 'true'
+          lfs: 'true'
+          
+      # Get artifacts from build job
+      - uses: actions/download-artifact@v3
+        id: download
+        with:
+          name: Content-build
+          path: ServerData
+        continue-on-error: true
+          
+      # Delete Artifact
+      - uses: geekyeggo/delete-artifact@v2
+        with:
+          name: Content-build
+        continue-on-error: true
+        
+      # Set up Python
+      - name: Set up Python
+        uses: actions/setup-python@v3
+        with:
+          python-version: 3.8
+
+      # Install Python dependencies
+      - name: Install Python dependencies
+        run: |
+          pip install requests
+          pip install pyyaml
+          pip install awscli
+          
+      # Merge all job status into 1
+      - name: Get Build Job Status
+        id: get-build-job-status
+        run: |
+          job_status_object=$(python3 Scripts/Workflows/get-build-job-status.py)   
+          echo "$job_status_object"
+          echo "job_build_status_json=$job_status_object" >> $GITHUB_OUTPUT
+        env:
+          IOS_JOB_STATUS: ${{ needs.build.outputs.iOS }}
+          ANDROID_JOB_STATUS: ${{ needs.build.outputs.Android }}
+          OSX_JOB_STATUS: ${{ needs.build.outputs.StandaloneOSX }}
+          WIN_JOB_STATUS: ${{ needs.build.outputs.StandaloneWindows64 }}
+          LINUX_JOB_STATUS: ${{ needs.build.outputs.StandaloneLinux64 }}
+          S3_ASSET_KEY: ${{ inputs.artifact }}
+          JOB_GUID: ${{ needs.setup.outputs.job-guid }}
+          PLATFORMS: ${{ inputs.platforms }}
+        continue-on-error: true
+          
+      # Update Build Row on Airtable By Record ID 
+      - name: Update Build Table Row With Status
+        id: update-build-table
+        run: |
+          record_guid=$(python3 Scripts/Workflows/update-build-table.py)      
+          echo "$record_guid"
+        env:
+          WORKFLOW_VERSION: ${{ inputs.build-workflow-version }}
+          DEVKIT_VERSION: ${{ inputs.devkit-version }}
+          AIRTABLE_RECORD_ID: ${{ needs.setup.outputs.job-guid }}
+          ASSET_OWNER: ${{ inputs.owner }}
+          BUILD_STATUS_STR_TEMP: ${{ steps.get-build-job-status.outputs.job_build_status_json }}
+        continue-on-error: true
+      
+      # S3 Upload
+      - uses: shallwefootball/upload-s3-action@master
+        if: ${{ fromJson(env.BUILD_JSON_STR).status != 'FAIL' }}
+        name: Upload to S3
+        id: S3
+        with:
+          aws_key_id: ${{ secrets.AWS_RUNNERS_DEV_ACCESS_KEY }}
+          aws_secret_access_key: ${{ secrets.AWS_RUNNERS_DEV_SECRET_KEY }}
+          aws_bucket: ${{ secrets.DEV_CONTENT_BUCKET }}
+          source_dir: 'ServerData'
+          destination_dir: ''
+        continue-on-error: true
+      
+      # Get thumbnail url
+      - name: Get Thumbnail Url
+        id: get-thumbnail
+        run: |
+          thumbnailUrl=$(echo "$OBJECT_LOCATIONS" | sed -n 's/.*\(https:\/\/[^"]*Thumbs[^"]*\.png\).*/\1/p')
+          if [ "$thumbnailUrl" == "" ]; then
+            echo "thumbnail_url=https://genies-content-dynamic.s3.us-west-2.amazonaws.com/Defaults/NoThumb.png" >> $GITHUB_OUTPUT
+          else
+            echo "$thumbnailUrl"
+            echo "thumbnail_url=$thumbnailUrl" >> $GITHUB_OUTPUT
+          fi
+        env:
+          OBJECT_LOCATIONS: ${{ steps.S3.outputs.object_locations }}
+        continue-on-error: true
+          
+      # Log to DataDog
+      - name: Log Status to DataDog
+        id: log-status-to-datadog
+        run: |
+          result=$(python3 Scripts/Workflows/log-status-to-datadog.py)
+          echo "job_guid=$result" >> $GITHUB_OUTPUT
+          echo "job guid: $result"
+        env:
+          HOST_NAME: ${{ inputs.runner }}
+          OWNER_NAME: ${{ inputs.owner }}
+          WORKFLOW_LINK: ${{ needs.setup.outputs.workflow-link }}
+        continue-on-error: true
+          
+      - name: Update Attempts if Failure
+        if: failure()
+        id: update-attempts
+        run: |
+          attempt=$(python3 -c "print(int('${{ inputs.attempt }}') + 1)")
+          echo "result==$attempt" >> $GITHUB_OUTPUT
+          
+      - name: Check if Workflow Failed and Attempts Are 2 or More
+        id: check-attempts
+        if: failure()
+        run: |
+          if [ $(python3 -c "print(int('${{ steps.update-attempts.outputs.result }}') >= 2)") ]; then
+            result=$(python3 Scripts/Workflows/update-build-table-fail.py)
+            echo "stop retires reached!"
+            echo "result==stop" >> $GITHUB_OUTPUT
+          else
+            if [ '${{ fromJson(env.BUILD_JSON_STR).version_exists }}' == 'no' ]; then
+              echo "Retry Attempt: '${{ steps.update-attempts.outputs.result }}'"
+              echo "result==run" >> $GITHUB_OUTPUT
+            else
+              echo "stop version already exists!"
+              echo "result==stop" >> $GITHUB_OUTPUT
+            fi
+          fi
+        env:
+          WORKFLOW_VERSION: ${{ inputs.build-workflow-version }}
+          DEVKIT_VERSION: ${{ inputs.devkit-version }}
+          AIRTABLE_RECORD_ID: ${{ needs.setup.outputs.job-guid }}
+          HOST_NAME: ${{ inputs.runner }}
+          OWNER_NAME: ${{ inputs.owner }}
+          WORKFLOW_LINK: ${{ steps.get-workflow-link.outputs.workflow_link }}
+          
+      - name: Rerun Workflow if Attempts Are Less Than 2
+        if: ${{ steps.check-attempts.outputs.result == 'run' }}
+        uses: benc-uk/workflow-dispatch@v1
+        with:
+          workflow: Content Build
+          repo: geniesinc/Dynamic-Content-Addressable-Builder
+          ref: ${{ github.ref }}
+          token: ${{ secrets.PRIVATE_REPO_ACCESS_TOKEN }}
+          inputs: '{ "artifact": "${{ inputs.artifact }}", "start-bucket-name": "${{ inputs.start-bucket-name }}", "guid": "${{ needs.setup.outputs.job-guid }}", "attempt": "${{ steps.update-attempts.outputs.result }}" }'
+                 
+      - name: Map status to color message
+        if: ${{ steps.check-attempts.outputs.result == 'stop' || success() }}
+        id: state-mapping
+        uses: kanga333/variable-mapper@master
+        with:
+          key: "${{ fromJson(env.BUILD_JSON_STR).status }}"
+          map: |
+            {
+              "SUCCESS": {
+                "color": "#3e983c"
+              },
+              "FAIL": {
+                "color": "#db3232"
+              },
+              ".*": {
+                "color": "#ffa500"
+              }
+            }
+          export_to: env
+        continue-on-error: true
+        
+      - name: Post to a Slack channel
+        if: ${{ steps.check-attempts.outputs.result == 'stop' || success() }}
+        id: slack
+        uses: slackapi/slack-github-action@v1.23.0
+        with:
+          channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
+          # For posting a rich message using Block Kit
+          payload: |
+            {
+              "text": " ",
+              "attachments": [
+                {
+                  "color": "${{ env.color }}",
+                  "blocks": [
+                    {
+                      "type": "section",
+                      "text": {
+                        "type": "mrkdwn",
+                        "text": "Build finished for *${{ fromJson(env.BUILD_JSON_STR).id }}*"
+                      }
+                    },
+                    {
+                      "type": "divider"
+                    },
+                    {
+                      "type": "section",
+                      "accessory": {
+                        "type": "image",
+                        "image_url": "${{ steps.get-thumbnail.outputs.thumbnail_url }}",
+                        "alt_text": "Asset Thumbnail"
+                      },
+                      "fields": [
+                        {
+                          "type": "mrkdwn",
+                          "text": "*Asset:* \n`${{ fromJson(env.BUILD_JSON_STR).id }}`"
+                        },
+                        {
+                          "type": "mrkdwn",
+                          "text": "*Status:*\n`${{ fromJson(env.BUILD_JSON_STR).status }}`"
+                        },
+                        {
+                          "type": "mrkdwn",
+                          "text": "*Version:*\n`${{ fromJson(env.BUILD_JSON_STR).version }}`"
+                        },
+                        {
+                          "type": "mrkdwn",
+                          "text": "*Asset Type:*\n`${{ fromJson(env.BUILD_JSON_STR).type }}`"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "divider"
+                    },
+                    {
+                      "type": "actions",
+                      "elements": [
+                        {
+                          "type": "button",
+                          "text": {
+                            "type": "plain_text",
+                            "text": "View Workflow Build",
+                            "emoji": true
+                          },
+                          "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                        },
+                        {
+                          "type": "button",
+                          "text": {
+                            "type": "plain_text",
+                            "text": "View Build Record",
+                            "emoji": true
+                          },
+                          "url": "https://airtable.com/${{ env.AIRTABLE_BASE_ID }}/${{ env.AIRTABLE_TABLE_ID }}/${{ needs.setup.outputs.job-guid }}"
+                        },
+                        {
+                          "type": "button",
+                          "text": {
+                            "type": "plain_text",
+                            "text": "View Asset Record",
+                            "emoji": true
+                          },
+                          "url": "https://airtable.com/${{ env.AIRTABLE_BASE_ID }}/${{ env.PARENT_TABLE_ID }}/${{ env.PARENT_RECORD_ID }}"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.CONTENT_SLACK_BOT_TOKEN }}
+          THUMB_URL: ${{ steps.get-thumbnail.outputs.thumbnail_url}}
+        continue-on-error: true
+          
+      # Update Parent Row With New Version 
+      - name: Update Parent Row With New Version
+        if: ${{ fromJson(env.BUILD_JSON_STR).status != 'FAIL' }}
+        id: update-parent-row-with-new-version
+        run: |
+          record_guid=$(python3 Scripts/Workflows/update-parent-row-with-new-version.py)      
+          echo "$record_guid"
+        continue-on-error: true
