@@ -62,6 +62,29 @@ jobs:
       #     customParameters: '-packageUrlOrPath ${{ env.asset }} -platforms android -buildProfile Dynamic'
 
 
+      - name: Get current day of year
+        id: day-of-year
+        run: echo "day=$(date +'%j')" >> $GITHUB_OUTPUT
+
+      # Get unity version to use with caching
+      - name: Get Unity version
+        id: unity-version
+        uses: appegy/unity-version-action@v1 
+
+      # Cache unity library, the cache will live for a day,
+      # so first build of the day might be slower on a target platform but
+      # later builds (on any branch or workflow) will be hitting the cache
+      # Note:
+      # restore-keys: will potentially have a cache hit on an older cache that hasn't expired.
+      - uses: actions/cache@v3
+        id: cache
+        with:
+          path: |
+            Library
+          key: Library-${{ steps.unity-version.outputs.unity-version }}
+            Library-${{ steps.unity-version.outputs.unity-version }}
+
+
       - name: Build Unity
         id: build-unity
         uses: geniesinc/game-ci-unity-builder@raad/no-quit
