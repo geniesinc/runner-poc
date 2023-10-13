@@ -52,11 +52,6 @@ on:
         required: true
         default: 'NULL'
         type: string
-      attempt:
-        description: 'Workflow Attempt'
-        required: true
-        default: '0'
-        type: string
         
 # env vars for whole workflow
 env:
@@ -384,69 +379,7 @@ jobs:
         env:
           OBJECT_LOCATIONS: ${{ steps.S3.outputs.object_locations }}
         continue-on-error: true
-          
-      - name: Update Attempts if Failure
-        if: failure()
-        id: update-attempts
-        run: |
-          attempt=$(python3 -c "print(int('${{ inputs.attempt }}') + 1)")
-          echo "result==$attempt" >> $GITHUB_OUTPUT
-          
-      - name: Check if Workflow Failed and Attempts Are 2 or More
-        id: check-attempts
-        if: failure()
-        run: |
-          if [ $(python3 -c "print(int('${{ steps.update-attempts.outputs.result }}') >= 2)") ]; then
-            result=$(python3 Scripts/Workflows/update-build-table-fail.py)
-            echo "stop retires reached!"
-            echo "result==stop" >> $GITHUB_OUTPUT
-          else
-            if [ '${{ fromJson(env.BUILD_JSON_STR).version_exists }}' == 'no' ]; then
-              echo "Retry Attempt: '${{ steps.update-attempts.outputs.result }}'"
-              echo "result==run" >> $GITHUB_OUTPUT
-            else
-              echo "stop version already exists!"
-              echo "result==stop" >> $GITHUB_OUTPUT
-            fi
-          fi
-        env:
-          WORKFLOW_VERSION: ${{ inputs.build-workflow-version }}
-          DEVKIT_VERSION: ${{ inputs.devkit-version }}
-          AIRTABLE_RECORD_ID: ${{ needs.setup.outputs.job-guid }}
-          HOST_NAME: ${{ inputs.runner }}
-          OWNER_NAME: ${{ inputs.owner }}
-          WORKFLOW_LINK: ${{ steps.get-workflow-link.outputs.workflow_link }}
-          
-      - name: Rerun Workflow if Attempts Are Less Than 2
-        if: ${{ steps.check-attempts.outputs.result == 'run' }}
-        uses: benc-uk/workflow-dispatch@v1
-        with:
-          workflow: Content Build
-          repo: geniesinc/Dynamic-Content-Addressable-Builder
-          ref: ${{ github.ref }}
-          token: ${{ secrets.PRIVATE_REPO_ACCESS_TOKEN }}
-          inputs: '{ "artifact": "${{ inputs.artifact }}", "start-bucket-name": "${{ inputs.start-bucket-name }}", "guid": "${{ needs.setup.outputs.job-guid }}", "attempt": "${{ steps.update-attempts.outputs.result }}" }'
-                 
-      - name: Map status to color message
-        if: ${{ steps.check-attempts.outputs.result == 'stop' || success() }}
-        id: state-mapping
-        uses: kanga333/variable-mapper@master
-        with:
-          key: "${{ fromJson(env.BUILD_JSON_STR).status }}"
-          map: |
-            {
-              "SUCCESS": {
-                "color": "#3e983c"
-              },
-              "FAIL": {
-                "color": "#db3232"
-              },
-              ".*": {
-                "color": "#ffa500"
-              }
-            }
-          export_to: env
-        continue-on-error: true
+
           
       # Update Parent Row With New Version 
       - name: Update Parent Row With New Version
