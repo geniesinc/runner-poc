@@ -50,16 +50,31 @@ jobs:
         shell: bash
         
       # Build
-      - name: Build Addressables Content for android
+      # - name: Build Addressables Content for android
+      #   uses: geniesinc/game-ci-unity-builder@raad/no-quit
+      #   env:
+      #     UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+      #     UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+      #     UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+      #   with:
+      #     targetPlatform: 'android'
+      #     buildMethod: 'Genies.Editor.Build.HeadlessDynamicBuildScript.HeadlessBuild'
+      #     customParameters: '-packageUrlOrPath ${{ env.asset }} -platforms android -buildProfile Dynamic'
+
+
+      - name: Build Unity
+        id: build-unity
         uses: geniesinc/game-ci-unity-builder@raad/no-quit
+        with:
+          buildMethod: ProcSkinningHeadless.CreateThingRig
+          customParameters: > 
+                            -logFile createThingRig_Log.txt
+                            -AssetArchive ${{ env.asset }}
+          allowDirtyBuild: true
         env:
-          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-        with:
-          targetPlatform: 'android'
-          buildMethod: 'Genies.Editor.Build.HeadlessDynamicBuildScript.HeadlessBuild'
-          customParameters: '-packageUrlOrPath ${{ env.asset }} -platforms android -buildProfile Dynamic'
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
       
       
       # - name: Upload a processed file to S3
