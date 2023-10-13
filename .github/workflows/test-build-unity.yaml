@@ -1,9 +1,9 @@
 name: Content Build
 
-# If another run happens on the branch, cancel current runs.
-concurrency:
-  group: ${{ github.ref }}-${{ github.workflow }}-${{ github.event.inputs.artifact }}
-  cancel-in-progress: false
+# # If another run happens on the branch, cancel current runs.
+# concurrency:
+#   group: ${{ github.ref }}-${{ github.workflow }}-${{ github.event.inputs.artifact }}
+#   cancel-in-progress: true
 
 on:
   workflow_dispatch:
@@ -385,19 +385,6 @@ jobs:
           OBJECT_LOCATIONS: ${{ steps.S3.outputs.object_locations }}
         continue-on-error: true
           
-      # Log to DataDog
-      - name: Log Status to DataDog
-        id: log-status-to-datadog
-        run: |
-          result=$(python3 Scripts/Workflows/log-status-to-datadog.py)
-          echo "job_guid=$result" >> $GITHUB_OUTPUT
-          echo "job guid: $result"
-        env:
-          HOST_NAME: ${{ inputs.runner }}
-          OWNER_NAME: ${{ inputs.owner }}
-          WORKFLOW_LINK: ${{ needs.setup.outputs.workflow-link }}
-        continue-on-error: true
-          
       - name: Update Attempts if Failure
         if: failure()
         id: update-attempts
@@ -459,100 +446,6 @@ jobs:
               }
             }
           export_to: env
-        continue-on-error: true
-        
-      - name: Post to a Slack channel
-        if: ${{ steps.check-attempts.outputs.result == 'stop' || success() }}
-        id: slack
-        uses: slackapi/slack-github-action@v1.23.0
-        with:
-          channel-id: ${{ secrets.SLACK_CHANNEL_ID }}
-          # For posting a rich message using Block Kit
-          payload: |
-            {
-              "text": " ",
-              "attachments": [
-                {
-                  "color": "${{ env.color }}",
-                  "blocks": [
-                    {
-                      "type": "section",
-                      "text": {
-                        "type": "mrkdwn",
-                        "text": "Build finished for *${{ fromJson(env.BUILD_JSON_STR).id }}*"
-                      }
-                    },
-                    {
-                      "type": "divider"
-                    },
-                    {
-                      "type": "section",
-                      "accessory": {
-                        "type": "image",
-                        "image_url": "${{ steps.get-thumbnail.outputs.thumbnail_url }}",
-                        "alt_text": "Asset Thumbnail"
-                      },
-                      "fields": [
-                        {
-                          "type": "mrkdwn",
-                          "text": "*Asset:* \n`${{ fromJson(env.BUILD_JSON_STR).id }}`"
-                        },
-                        {
-                          "type": "mrkdwn",
-                          "text": "*Status:*\n`${{ fromJson(env.BUILD_JSON_STR).status }}`"
-                        },
-                        {
-                          "type": "mrkdwn",
-                          "text": "*Version:*\n`${{ fromJson(env.BUILD_JSON_STR).version }}`"
-                        },
-                        {
-                          "type": "mrkdwn",
-                          "text": "*Asset Type:*\n`${{ fromJson(env.BUILD_JSON_STR).type }}`"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "divider"
-                    },
-                    {
-                      "type": "actions",
-                      "elements": [
-                        {
-                          "type": "button",
-                          "text": {
-                            "type": "plain_text",
-                            "text": "View Workflow Build",
-                            "emoji": true
-                          },
-                          "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
-                        },
-                        {
-                          "type": "button",
-                          "text": {
-                            "type": "plain_text",
-                            "text": "View Build Record",
-                            "emoji": true
-                          },
-                          "url": "https://airtable.com/${{ env.AIRTABLE_BASE_ID }}/${{ env.AIRTABLE_TABLE_ID }}/${{ needs.setup.outputs.job-guid }}"
-                        },
-                        {
-                          "type": "button",
-                          "text": {
-                            "type": "plain_text",
-                            "text": "View Asset Record",
-                            "emoji": true
-                          },
-                          "url": "https://airtable.com/${{ env.AIRTABLE_BASE_ID }}/${{ env.PARENT_TABLE_ID }}/${{ env.PARENT_RECORD_ID }}"
-                        }
-                      ]
-                    }
-                  ]
-                }
-              ]
-            }
-        env:
-          SLACK_BOT_TOKEN: ${{ secrets.CONTENT_SLACK_BOT_TOKEN }}
-          THUMB_URL: ${{ steps.get-thumbnail.outputs.thumbnail_url}}
         continue-on-error: true
           
       # Update Parent Row With New Version 
