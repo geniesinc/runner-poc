@@ -20,54 +20,41 @@ jobs:
     runs-on: genies-internal-content-runner
     timeout-minutes: 1
     env:
-      start_bucket_name: "runner-poc-bucket"
+      start_bucket_name: "genies-asset-bucket-test"
       result_bucket_name: "runner-poc-testing-result"
+      asset: "0a225c6b-c9c3-47b2-8818-de8a86a89190.zip"
       
     steps:
         
-      - name: Hi
-        run: |
-          sleep 300
-        shell: bash
-
-      - name: rerun job
-        if: failure() || cancelled()
-        uses: benc-uk/workflow-dispatch@v1
-        with:
-          workflow: Update image tags
-          repo: geniesinc/runner-poc
-          ref: main
-          token: ${{ secrets.PRIVATE_REPO_ACCESS_TOKEN }}
-      # - name: Retry on failure of build
-      #   if: always() && failure()
-      #   uses: mvasigh/dispatch-action@main
-      #   with:
-      #     token: fa3126c935cae0eaddba6f4c7cb5249bf3c62bd8
-      #     repo: runner-poc
-      #     owner: geniesinc
-      #     event_type: retry_job
-    
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       # - uses: actions/checkout@v3
       
-      # - name: Install AWS cli
-      #   uses: unfor19/install-aws-cli-action@v1
+      - name: Install AWS cli
+        uses: unfor19/install-aws-cli-action@v1
 
-      # - name: Assume an AWS role
-      #   uses: aws-actions/configure-aws-credentials@v1
-      #   with:
-      #     role-to-assume: arn:aws:iam::583625886946:role/genies_deployer-role #arn:aws:iam::608392574519:role/devkit-s3-manager
-      #     aws-region: us-west-2
+      - name: Assume an AWS role
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: arn:aws:iam::583625886946:role/genies_deployer-role #arn:aws:iam::608392574519:role/devkit-s3-manager
+          aws-region: us-west-2
         
-      # - name: Download a file from the starting bucket
-      #   run: |
-      #     aws s3 cp s3://${{ env.start_bucket_name }}/${{ inputs.artifact }} ${{ inputs.artifact }}
-      #   shell: bash
+      - name: Download a file from the starting bucket
+        run: |
+          aws s3 cp s3://${{ env.start_bucket_name }}/${{ env.asset }} ${{ env.asset }}
+        shell: bash
         
-      # - name: Process the file
-      #   run: |
-      #     echo 'This file is now processed!' >> ${{ inputs.artifact }}
-      #   shell: bash
+      # Build
+      - name: Build Addressables Content for android
+        uses: geniesinc/game-ci-unity-builder@raad/no-quit
+        env:
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          targetPlatform: 'android'
+          buildMethod: 'Genies.Editor.Build.HeadlessDynamicBuildScript.HeadlessBuild'
+          customParameters: '-packageUrlOrPath ${{ env.asset }} -platforms android -buildProfile Dynamic'
+      
       
       # - name: Upload a processed file to S3
       #   run: |
