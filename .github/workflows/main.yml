@@ -32,11 +32,17 @@ jobs:
       - name: Install AWS cli
         uses: unfor19/install-aws-cli-action@v1
 
-      - name: Assume an AWS role
-        uses: aws-actions/configure-aws-credentials@v1
+      # - name: Assume an AWS role
+      #   uses: aws-actions/configure-aws-credentials@v1
+      #   with:
+      #     role-to-assume: arn:aws:iam::583625886946:role/genies_deployer-role #arn:aws:iam::608392574519:role/devkit-s3-manager
+      #     aws-region: us-west-2
+      - name: Set up AWS CLI
+        uses: aws-actions/configure-aws-credentials@v3
         with:
-          role-to-assume: arn:aws:iam::583625886946:role/genies_deployer-role #arn:aws:iam::608392574519:role/devkit-s3-manager
-          aws-region: us-west-2
+          aws-access-key-id: ${{ secrets.AWS_RUNNERS_DEV_ACCESS_KEY }}
+          aws-secret-access-key: ${{ secrets.AWS_RUNNERS_DEV_SECRET_KEY }}
+          aws-region: 'us-west-2'
         
       - name: Download a file from the starting bucket
         run: |
