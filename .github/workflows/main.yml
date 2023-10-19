@@ -28,76 +28,81 @@ jobs:
         
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       # - uses: actions/checkout@v3
-      
-      - name: Install AWS cli
-        uses: unfor19/install-aws-cli-action@v1
-
-      # - name: Assume an AWS role
-      #   uses: aws-actions/configure-aws-credentials@v1
-      #   with:
-      #     role-to-assume: arn:aws:iam::583625886946:role/genies_deployer-role #arn:aws:iam::608392574519:role/devkit-s3-manager
-      #     aws-region: us-west-2
-      - name: Set up AWS CLI
-        uses: aws-actions/configure-aws-credentials@v3
-        with:
-          aws-access-key-id: ${{ secrets.AWS_RUNNERS_DEV_ACCESS_KEY }}
-          aws-secret-access-key: ${{ secrets.AWS_RUNNERS_DEV_SECRET_KEY }}
-          aws-region: 'us-west-2'
-        
-      - name: Download a file from the starting bucket
+      - name: Setup docker cache
         run: |
-          aws s3 cp s3://${{ env.start_bucket_name }}/${{ env.asset }} ${{ env.asset }}
-        shell: bash
+          echo '{ "data-root": "/cache/" }' | sudo tee /etc/docker/daemon.json
+          sudo service docker stop
+          sudo dockerd &
+      
+      # - name: Install AWS cli
+      #   uses: unfor19/install-aws-cli-action@v1
+
+      # # - name: Assume an AWS role
+      # #   uses: aws-actions/configure-aws-credentials@v1
+      # #   with:
+      # #     role-to-assume: arn:aws:iam::583625886946:role/genies_deployer-role #arn:aws:iam::608392574519:role/devkit-s3-manager
+      # #     aws-region: us-west-2
+      # - name: Set up AWS CLI
+      #   uses: aws-actions/configure-aws-credentials@v3
+      #   with:
+      #     aws-access-key-id: ${{ secrets.AWS_RUNNERS_DEV_ACCESS_KEY }}
+      #     aws-secret-access-key: ${{ secrets.AWS_RUNNERS_DEV_SECRET_KEY }}
+      #     aws-region: 'us-west-2'
         
-      # Build
-      # - name: Build Addressables Content for android
+      # - name: Download a file from the starting bucket
+      #   run: |
+      #     aws s3 cp s3://${{ env.start_bucket_name }}/${{ env.asset }} ${{ env.asset }}
+      #   shell: bash
+        
+      # # Build
+      # # - name: Build Addressables Content for android
+      # #   uses: geniesinc/game-ci-unity-builder@raad/no-quit
+      # #   env:
+      # #     UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+      # #     UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+      # #     UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+      # #   with:
+      # #     targetPlatform: 'android'
+      # #     buildMethod: 'Genies.Editor.Build.HeadlessDynamicBuildScript.HeadlessBuild'
+      # #     customParameters: '-packageUrlOrPath ${{ env.asset }} -platforms android -buildProfile Dynamic'
+
+
+      # - name: Get current day of year
+      #   id: day-of-year
+      #   run: echo "day=$(date +'%j')" >> $GITHUB_OUTPUT
+
+      # # Get unity version to use with caching
+      # - name: Get Unity version
+      #   id: unity-version
+      #   uses: appegy/unity-version-action@v1 
+
+      # # Cache unity library, the cache will live for a day,
+      # # so first build of the day might be slower on a target platform but
+      # # later builds (on any branch or workflow) will be hitting the cache
+      # # Note:
+      # # restore-keys: will potentially have a cache hit on an older cache that hasn't expired.
+      # - uses: actions/cache@v3
+      #   id: cache
+      #   with:
+      #     path: |
+      #       Library
+      #     key: Library-${{ steps.unity-version.outputs.unity-version }}
+      #       Library-${{ steps.unity-version.outputs.unity-version }}
+
+
+      # - name: Build Unity
+      #   id: build-unity
       #   uses: geniesinc/game-ci-unity-builder@raad/no-quit
+      #   with:
+      #     buildMethod: ProcSkinningHeadless.CreateThingRig
+      #     customParameters: > 
+      #                       -logFile createThingRig_Log.txt
+      #                       -AssetArchive ${{ env.asset }}
+      #     allowDirtyBuild: true
       #   env:
-      #     UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
       #     UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
       #     UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-      #   with:
-      #     targetPlatform: 'android'
-      #     buildMethod: 'Genies.Editor.Build.HeadlessDynamicBuildScript.HeadlessBuild'
-      #     customParameters: '-packageUrlOrPath ${{ env.asset }} -platforms android -buildProfile Dynamic'
-
-
-      - name: Get current day of year
-        id: day-of-year
-        run: echo "day=$(date +'%j')" >> $GITHUB_OUTPUT
-
-      # Get unity version to use with caching
-      - name: Get Unity version
-        id: unity-version
-        uses: appegy/unity-version-action@v1 
-
-      # Cache unity library, the cache will live for a day,
-      # so first build of the day might be slower on a target platform but
-      # later builds (on any branch or workflow) will be hitting the cache
-      # Note:
-      # restore-keys: will potentially have a cache hit on an older cache that hasn't expired.
-      - uses: actions/cache@v3
-        id: cache
-        with:
-          path: |
-            Library
-          key: Library-${{ steps.unity-version.outputs.unity-version }}
-            Library-${{ steps.unity-version.outputs.unity-version }}
-
-
-      - name: Build Unity
-        id: build-unity
-        uses: geniesinc/game-ci-unity-builder@raad/no-quit
-        with:
-          buildMethod: ProcSkinningHeadless.CreateThingRig
-          customParameters: > 
-                            -logFile createThingRig_Log.txt
-                            -AssetArchive ${{ env.asset }}
-          allowDirtyBuild: true
-        env:
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+      #     UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
       
       
       # - name: Upload a processed file to S3
