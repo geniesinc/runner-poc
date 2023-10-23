@@ -25,13 +25,15 @@ jobs:
       asset: "0a225c6b-c9c3-47b2-8818-de8a86a89190.zip"
       
     steps:
+      - name: test
+        run: echo "Testing, hello world"
         
-      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-      # - uses: actions/checkout@v3
-      - name: Setup docker cache
-        run: |
-          docker load -i /cache/ubuntu-2021.3.16f1-ios-1.0.1.tar
-          docker tag unityci/editor:ubuntu-2021.3.16f1-ios-1.0.1 608392574519.dkr.ecr.us-west-2.amazonaws.com/unityci-editor:ubuntu-2021.3.26f1-ios-1
+      # # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      # # - uses: actions/checkout@v3
+      # - name: Setup docker cache
+      #   run: |
+      #     docker load -i /cache/ubuntu-2021.3.16f1-ios-1.0.1.tar
+      #     docker tag unityci/editor:ubuntu-2021.3.16f1-ios-1.0.1 608392574519.dkr.ecr.us-west-2.amazonaws.com/unityci-editor:ubuntu-2021.3.26f1-ios-1
 
       
       # - name: Install AWS cli
