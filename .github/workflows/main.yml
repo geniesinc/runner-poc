@@ -26,7 +26,7 @@ jobs:
       
     steps:
       - name: test
-        run: echo "Testing, hello world"
+        run: echo "sleeping for 500 seconds..." && sleep 500
         
       # # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       # # - uses: actions/checkout@v3
