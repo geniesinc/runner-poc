@@ -17,7 +17,8 @@ on:
 jobs:
 
   build:
-    runs-on: genies-internal-runner
+    runs-on:
+      group: genies-runners
     # timeout-minutes: 1
     env:
       start_bucket_name: "genies-asset-bucket-test"
