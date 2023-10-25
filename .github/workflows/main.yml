@@ -17,8 +17,7 @@ on:
 jobs:
 
   build:
-    runs-on:
-      group: genies-internal-content-runner
+    runs-on: genies-internal-content-runner
     # timeout-minutes: 1
     env:
       start_bucket_name: "genies-asset-bucket-test"
@@ -27,7 +26,7 @@ jobs:
       
     steps:
       - name: test
-        run: echo "ello"
+        run: sleep 300
         
       # # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       # # - uses: actions/checkout@v3
