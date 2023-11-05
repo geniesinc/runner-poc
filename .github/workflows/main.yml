@@ -19,14 +19,10 @@ jobs:
   build:
     runs-on: genies-internal-art-runner-test
     # timeout-minutes: 1
-    env:
-      start_bucket_name: "genies-asset-bucket-test"
-      result_bucket_name: "runner-poc-testing-result"
-      asset: "0a225c6b-c9c3-47b2-8818-de8a86a89190.zip"
       
     steps:
       - name: test
-        run: ls ~/
+        run: sleep 300
         
       # # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       # # - uses: actions/checkout@v3
