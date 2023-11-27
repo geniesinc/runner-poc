@@ -13,16 +13,16 @@ jobs:
   # This workflow contains a single job called "build"
   build:
     # The type of runner that the job will run on
-    runs-on: 
-      group: genies-internal-runner
-    permissions:
-      id-token: write # This is required for requesting the JWT
-      contents: read  # This is required for actions/checkout
+    # runs-on: 
+    #   group: genies-internal-runner
+    # permissions:
+    #   id-token: write # This is required for requesting the JWT
+    #   contents: read  # This is required for actions/checkout
 
-    steps:
-      - uses: actions/checkout@v3
+    # steps:
+    #   - uses: actions/checkout@v3
       
-      - uses: geniesinc/security-pipelines/.github/workflows/build_and_push.yaml@SRE/buildxHotfix
+    uses: geniesinc/security-pipelines/.github/workflows/build_and_push.yaml@SRE/buildxHotfix
         # with:
         #   root: "test"
         #   service: "test"
